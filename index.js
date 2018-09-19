@@ -10,6 +10,10 @@ const generateId = (length = 3) => {
     return crypto.randomBytes(length).toString('hex');
 }
 
+const rooms = [];
+
+const clients = [];
+
 app.get('/', function(req, res){
   res.send('<h1>Hello world</h1>');
 });
@@ -19,13 +23,26 @@ http.listen(3001, function(){
 });
 
 io.on('connection', socket => {
-    log.success('A Client has connected');
-    log.json(socket.connected);
-    socket.emit('ROOM_OFFER', {
-        roomCode: generateId()
+    clients.push(socket);
+    
+    socket.on('REQUEST_ROOM', data => {
+        socket.emit('ROOM_OFFER', {
+            roomCode: generateId()
+        });
     });
+
+    socket.on('SEND_MESSAGE', data => {
+        log.json(data);
+        socket.broadcast.emit('RELEASE_MESSAGE', {
+            message: data.message   
+        });
+    });
+
+    socket.on('JOIN_ROOM', data => {
+        log.json(data);
+    });
+
     socket.on('disconnect', () => {
-        log.danger('User has disconnected');
     });
 });
 
