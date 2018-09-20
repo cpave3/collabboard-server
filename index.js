@@ -40,17 +40,18 @@ io.on('connection', socket => {
 
     socket.on('SEND_MESSAGE', data => {
         log.json(data);
-        socket.broadcast.to(getRoom(socket)).emit('RELEASE_MESSAGE', {
+        socket.broadcast.to(getValue(socket, 'room')).emit('RELEASE_MESSAGE', {
             message: data.message   
         });
     });
 
     socket.on('JOIN_ROOM', data => {
         socket.join(data.roomCode);
-        currentConnections[socket.id].room = data.roomCode;
-        currentConnections[socket.id].role = 'particiapnt';
-        currentConnections[socket.id].username = data.username;
+        setValue(socket, 'room', data.roomCode);
+        setValue(socket, 'role', 'participant');
+        setValue(socket, 'username', data.username);
         socket.broadcast.to(data.roomCode).emit('PLAYER_JOINED', {
+            id: socket.id,
             username: data.username,
             role: 'participant'
         });
@@ -58,12 +59,18 @@ io.on('connection', socket => {
     });
 
     socket.on('disconnect', () => {
+        io.in(getValue(socket, 'room')).emit('PLAYER_LEFT', {
+            id: socket.id
+        });
         delete currentConnections[socket.id];
     });
 });
 
-const getRoom = socket => {
-    return currentConnections[socket.id].room || socket.id;
+const getValue = (socket, key) => {
+    return currentConnections[socket.id][key] || null;
 }
 
+const setValue = (socket, key, value) => {
+    currentConnections[socket.id][key] = value;
+}
 
