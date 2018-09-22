@@ -10,7 +10,7 @@ const generateId = (length = 3) => {
     return crypto.randomBytes(length).toString('hex');
 }
 
-const rooms = [];
+const rooms = {};
 
 const currentConnections = {};
 
@@ -32,6 +32,7 @@ io.on('connection', socket => {
         currentConnections[socket.id].room = roomCode;
         currentConnections[socket.id].role = 'host';
         socket.join(roomCode);
+        rooms[roomCode] = { players: [] };
         // Send the ID back to the host
         socket.emit('ROOM_OFFER', {
             roomCode
@@ -50,16 +51,21 @@ io.on('connection', socket => {
         setValue(socket, 'room', data.roomCode);
         setValue(socket, 'role', 'participant');
         setValue(socket, 'username', data.username);
+        setValue(socket, 'vip', rooms[roomCode].players.length === 0);
+        rooms[roomCode].players.push(socket.id);
         socket.broadcast.to(data.roomCode).emit('PLAYER_JOINED', {
             id: socket.id,
             username: data.username,
-            role: 'participant'
+            role: getValue(socket, 'vip') ? 'organiser' : 'participant'
         });
         log.json(data);
     });
 
     socket.on('disconnect', () => {
-        io.in(getValue(socket, 'room')).emit('PLAYER_LEFT', {
+        const roomCode = getValue(socket, 'room');
+        // Remove this player from the room occupants list
+        rooms[roomCode].players = rooms[roomCode].players.filter(id => id !== socket.id);
+        io.in(roomCode).emit('PLAYER_LEFT', {
             id: socket.id
         });
         delete currentConnections[socket.id];
