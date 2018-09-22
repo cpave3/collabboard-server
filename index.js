@@ -64,7 +64,9 @@ io.on('connection', socket => {
     socket.on('disconnect', () => {
         const roomCode = getValue(socket, 'room');
         // Remove this player from the room occupants list
-        rooms[roomCode].players = rooms[roomCode].players.filter(id => id !== socket.id);
+        if (roomCode && rooms[roomCode].players.length) {
+            rooms[roomCode].players = rooms[roomCode].players.filter(id => id !== socket.id);
+        }
         io.in(roomCode).emit('PLAYER_LEFT', {
             id: socket.id
         });
