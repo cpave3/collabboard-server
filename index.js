@@ -51,14 +51,30 @@ io.on('connection', socket => {
         setValue(socket, 'room', data.roomCode);
         setValue(socket, 'role', 'participant');
         setValue(socket, 'username', data.username);
-        setValue(socket, 'vip', rooms[roomCode].players.length === 0);
-        rooms[roomCode].players.push(socket.id);
-        socket.broadcast.to(data.roomCode).emit('PLAYER_JOINED', {
-            id: socket.id,
-            username: data.username,
-            role: getValue(socket, 'vip') ? 'organiser' : 'participant'
+        setValue(socket, 'vip', rooms[data.roomCode].players && rooms[data.roomCode].players.length === 0);
+
+        rooms[data.roomCode].players.push(socket.id);
+
+        const players = rooms[data.roomCode].players.map(player => {
+            return {
+                id: player, 
+                username: getValue({ id: player }, 'username'),
+                vip: getValue({ id: player }, 'vip', false)
+            };
         });
+
+        io.in(data.roomCode).emit('PLAYER_SYNC', players);
         log.json(data);
+    });
+
+    // Handle the signal to start, take all players to their rooms
+    socket.on('START_SIGNAL', data => {
+        // First, find which room this player is from
+        log.json({
+            action: 'START',
+            socketId: socket.id,
+            room: getValue(socket, 'room')
+        });
     });
 
     socket.on('disconnect', () => {
@@ -74,8 +90,8 @@ io.on('connection', socket => {
     });
 });
 
-const getValue = (socket, key) => {
-    return currentConnections[socket.id][key] || null;
+const getValue = (socket, key, default = null) => {
+    return currentConnections[socket.id][key] || default;
 }
 
 const setValue = (socket, key, value) => {
