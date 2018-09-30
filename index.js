@@ -6,6 +6,8 @@ const Log = require ('sleek-log')
 
 const crypto = require("crypto");
 
+const Types = require('./constants/actionTypes');
+
 const generateId = (length = 3) => {
     return crypto.randomBytes(length).toString('hex');
 }
@@ -22,79 +24,71 @@ http.listen(3001, function(){
     log.info('Listening on *:3001');
 });
 
-io.on('connection', socket => {
+io.on('connect', socket => {
     currentConnections[socket.id] = { socket, room: null, role: null };
+    log.success(socket.id);
     
-    socket.on('REQUEST_ROOM', data => {
-        // Generate a room ID
-        const roomCode = generateId();
-        // Add the Host to this room
-        currentConnections[socket.id].room = roomCode;
-        currentConnections[socket.id].role = 'host';
-        socket.join(roomCode);
-        rooms[roomCode] = { players: [] };
-        // Send the ID back to the host
-        socket.emit('ROOM_OFFER', {
+    // The client has requested to join or make a room
+    socket.on(Types.JOIN_ROOM, data => {
+        // The payload should contain the roomCode
+        const roomCode = data.roomCode;
+
+        log.info(`${socket.id} joined ${roomCode}`);
+
+        // Determine if this exists
+        if (!rooms[roomCode]) {
+            rooms[roomCode] = {
+                owner: socket.id,
+                users: [],
+                canvas: []
+            }
+        } else {
+            // TODO: Handle room auth here
+        }
+
+        // Join this room
+        rooms[roomCode].users.push(socket.id);
+        currentConnections[socket.id] = {
             roomCode
-        });
-    });
-
-    socket.on('SEND_MESSAGE', data => {
-        log.json(data);
-        socket.broadcast.to(getValue(socket, 'room')).emit('RELEASE_MESSAGE', {
-            message: data.message   
-        });
-    });
-
-    socket.on('JOIN_ROOM', data => {
-        socket.join(data.roomCode);
-        setValue(socket, 'room', data.roomCode);
-        setValue(socket, 'role', 'participant');
-        setValue(socket, 'username', data.username);
-        setValue(socket, 'vip', rooms[data.roomCode].players && rooms[data.roomCode].players.length === 0);
-
-        rooms[data.roomCode].players.push(socket.id);
-
-        const players = rooms[data.roomCode].players.map(player => {
-            return {
-                id: player, 
-                username: getValue({ id: player }, 'username'),
-                vip: getValue({ id: player }, 'vip', false)
-            };
+        }
+        socket.join(roomCode);
+    
+        // Send the room back to the user
+        socket.emit(Types.ENTER_ROOM, {
+            ...rooms[roomCode]
         });
 
-        io.in(data.roomCode).emit('PLAYER_SYNC', players);
-        log.json(data);
+        io.in(roomCode).emit(Types.USER_SYNC, {
+            users: rooms[roomCode].users
+        });
+
+        socket.emit(Types.CANVAS_SYNC, rooms[roomCode].canvas)
     });
 
-    // Handle the signal to start, take all players to their rooms
-    socket.on('START_SIGNAL', data => {
-        // First, find which room this player is from
+    // A client has sent their canvas diff
+    socket.on(Types.CANVAS_UPDATE, data => {
+        const { roomCode } = currentConnections[socket.id];
         log.json({
-            action: 'START',
-            socketId: socket.id,
-            room: getValue(socket, 'room')
+            socket: socket.id,
+            dataSize: data.length
         });
-    });
+
+        // Push the diff into the shared canvas
+        rooms[roomCode].canvas = data.objects;
+
+        // Push out the new canvas state
+        socket.broadcast.to(roomCode).emit(Types.CANVAS_SYNC, rooms[roomCode].canvas);
+    })
 
     socket.on('disconnect', () => {
-        const roomCode = getValue(socket, 'room');
-        // Remove this player from the room occupants list
-        if (roomCode && rooms[roomCode].players.length) {
-            rooms[roomCode].players = rooms[roomCode].players.filter(id => id !== socket.id);
-        }
-        io.in(roomCode).emit('PLAYER_LEFT', {
-            id: socket.id
-        });
-        delete currentConnections[socket.id];
+        // const roomCode = getValue(socket, 'room');
+        // // Remove this player from the room occupants list
+        // if (roomCode && rooms[roomCode].players.length) {
+        //     rooms[roomCode].players = rooms[roomCode].players.filter(id => id !== socket.id);
+        // }
+        // io.in(roomCode).emit('PLAYER_LEFT', {
+        //     id: socket.id
+        // });
+        // delete currentConnections[socket.id];
     });
 });
-
-const getValue = (socket, key, default = null) => {
-    return currentConnections[socket.id][key] || default;
-}
-
-const setValue = (socket, key, value) => {
-    currentConnections[socket.id][key] = value;
-}
-
