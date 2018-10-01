@@ -68,16 +68,18 @@ io.on('connect', socket => {
     // A client has sent their canvas diff
     socket.on(Types.CANVAS_UPDATE, data => {
         const { roomCode } = currentConnections[socket.id];
-        log.json({
-            socket: socket.id,
-            dataSize: data.length
-        });
+        if (roomCode) {
+            log.json({
+                socket: socket.id,
+                dataSize: data.length
+            });
 
-        // Push the diff into the shared canvas
-        rooms[roomCode].canvas = data.objects;
+            // Push the diff into the shared canvas
+            rooms[roomCode].canvas = data.objects;
 
-        // Push out the new canvas state
-        socket.broadcast.to(roomCode).emit(Types.CANVAS_SYNC, rooms[roomCode].canvas);
+            // Push out the new canvas state
+            socket.broadcast.to(roomCode).emit(Types.CANVAS_SYNC, rooms[roomCode].canvas);
+        } else { log.danger('null room user sent update'); }
     })
 
     socket.on('disconnect', () => {
