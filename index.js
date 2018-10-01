@@ -16,12 +16,14 @@ const rooms = {};
 
 const currentConnections = {};
 
+const PORT = process.env.PORT || 3001;
+
 app.get('/', function(req, res){
-  res.send('<h1>Hello world</h1>');
+  res.send(`<h1>Running on ${PORT}</h1>`);
 });
 
-http.listen(3001, function(){
-    log.info('Listening on *:3001');
+http.listen(PORT, function(){
+    log.info(`Listening on *:${PORT}`);
 });
 
 io.on('connect', socket => {
