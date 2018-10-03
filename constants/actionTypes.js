@@ -10,4 +10,6 @@ module.exports = {
   SEND_DIFF: "ROOM/CANVAS/DIFF", // A user has change their canvas and sent the diff for propagation
   CANVAS_UPDATE: "ROOM/CANVAS/UPDATE", // The server will release the changes to any listening clients
   CANVAS_SYNC: "ROOM/CANVAS/SYNC",
+
+  PING: "PING"
 };
