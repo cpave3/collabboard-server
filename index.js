@@ -26,21 +26,25 @@ http.listen(PORT, function() {
   log.info(`Listening on *:${PORT}`);
 });
 
-const startInterval = socket => {
-  return setInterval(() => {
-    socket.emit(Types.PING, { ping: "stay alive" });
-    log.info(`PINGING: ${socket.id}`);
-  }, 60000);
-};
-
 io.on("connect", socket => {
   currentConnections[socket.id] = {
     socket,
     room: null,
-    role: null,
-    interval: startInterval(socket)
+    role: null
   };
   log.success(socket.id);
+
+  // Send heartbeats
+  const interval = setInterval(() => {
+    socket.emit(Types.PING, { ping: "stay alive" });
+    log.info(`PINGING: ${socket.id}`);
+  }, 60000);
+
+  socket.on("disconnect", () => {
+    // stop the interval
+    clearInterval(interval);
+    delete currentConnections[socket.id];
+  });
 
   // The client has requested to join or make a room
   socket.on(Types.JOIN_ROOM, data => {
@@ -98,21 +102,5 @@ io.on("connect", socket => {
     } else {
       log.danger("null room user sent update");
     }
-  });
-
-  socket.on("disconnect", () => {
-      // stop the interval
-      clearInterval(currentConnections[socket.id].interval);
-      delete currentConnections[socket.id]
-
-    // const roomCode = getValue(socket, 'room');
-    // // Remove this player from the room occupants list
-    // if (roomCode && rooms[roomCode].players.length) {
-    //     rooms[roomCode].players = rooms[roomCode].players.filter(id => id !== socket.id);
-    // }
-    // io.in(roomCode).emit('PLAYER_LEFT', {
-    //     id: socket.id
-    // });
-    // delete currentConnections[socket.id];
   });
 });
