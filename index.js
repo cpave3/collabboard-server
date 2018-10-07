@@ -100,7 +100,7 @@ io.on("connect", socket => {
         .to(roomCode)
         .emit(Types.CANVAS_SYNC, rooms[roomCode].canvas);
     } else {
-      log.danger("null room user sent update");
+      log.warning(`(${socket.id}) null room user sent update`);
     }
   });
 });
